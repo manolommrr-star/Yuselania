@@ -37,54 +37,93 @@ const DISCOUNTS = { normal: 0, forta: 0 }; // Forta price already includes disco
 // Formato simple sin problemas de locale ARS
 const FORMAT = (val) => '$' + Number(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Real cash register sound - loads CC0 MP3 from slapalert.com
-let cashRegisterAudio = null;
+// Local cash register sound - uses local cha-ching.mp3 file
+let cashRegisterBuffer = null;
 let audioContext = null;
 
-function initCashRegisterSound() {
+async function initCashRegisterSound() {
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    cashRegisterAudio = new Audio();
-    cashRegisterAudio.src = 'https://slapalert.com/sounds/cha-ching.mp3';
-    cashRegisterAudio.preload = 'auto';
-    cashRegisterAudio.crossOrigin = 'anonymous';
     
-    // Decode for Web Audio API (better control)
-    cashRegisterAudio.addEventListener('canplaythrough', () => {
-      audioContext.decodeAudioData(
-        fetch(cashRegisterAudio.src).then(r => r.arrayBuffer())
-      ).then(buffer => {
-        cashRegisterAudio._buffer = buffer;
-      }).catch(() => {});
-    });
+    // Try to load local MP3 first
+    const response = await fetch('cha-ching.mp3');
+    if (response.ok) {
+      const arrayBuffer = await response.arrayBuffer();
+      cashRegisterBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log('Local cha-ching.mp3 loaded');
+      return;
+    }
   } catch (e) {
-    console.log('Audio init failed:', e);
+    console.log('Local MP3 not found, using synthesized fallback');
   }
+  
+  // Fallback: synthesized realistic ka-ching
+  cashRegisterBuffer = createSynthesizedKaChing(audioContext);
 }
 
-function playCashRegisterSound() {
-  try {
-    if (!audioContext) initCashRegisterSound();
+function createSynthesizedKaChing(ctx) {
+  const sampleRate = ctx.sampleRate;
+  const duration = 1.2;
+  const length = sampleRate * duration;
+  const buffer = ctx.createBuffer(1, length, sampleRate);
+  const data = buffer.getChannelData(0);
+  
+  for (let i = 0; i < length; i++) {
+    const t = i / sampleRate;
+    let sample = 0;
     
-    // Resume context if suspended (browser policy)
-    if (audioContext.state === 'suspended') {
-      audioContext.resume();
+    // "KA" - low thud (0-0.1s)
+    if (t < 0.1) {
+      const freq = 220 * Math.exp(-t * 20);
+      sample += Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 15) * 0.5;
     }
     
-    // Use decoded buffer if available, otherwise HTMLAudioElement
-    if (cashRegisterAudio._buffer) {
+    // "CHING" - metallic ring (0.08s onwards)
+    if (t >= 0.08) {
+      const rt = t - 0.08;
+      const env = Math.exp(-rt * 2);
+      
+      // Fundamental + harmonics for metallic sound
+      sample += Math.sin(2 * Math.PI * 1320 * rt) * env * 0.4;
+      sample += Math.sin(2 * Math.PI * 2640 * rt) * env * 0.25;
+      sample += Math.sin(2 * Math.PI * 3960 * rt) * env * 0.15;
+      sample += Math.sin(2 * Math.PI * 1760 * 1.4 * rt) * env * 0.12; // inharmonic
+      sample += Math.sin(2 * Math.PI * 1760 * 2.5 * rt) * env * 0.08; // inharmonic
+    }
+    
+    // Mechanical click at 0.16s
+    if (t >= 0.16 && t < 0.18) {
+      sample += (Math.random() * 2 - 1) * Math.exp(-(t - 0.16) * 100) * 0.3;
+    }
+    
+    data[i] = sample * 0.5;
+  }
+  
+  return buffer;
+}
+
+async function playCashRegisterSound() {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    if (!cashRegisterBuffer) {
+      await initCashRegisterSound();
+    }
+    
+    if (cashRegisterBuffer) {
       const source = audioContext.createBufferSource();
-      source.buffer = cashRegisterAudio._buffer;
+      source.buffer = cashRegisterBuffer;
       const gain = audioContext.createGain();
-      gain.gain.value = 0.5;
+      gain.gain.value = 0.6;
       source.connect(gain);
       gain.connect(audioContext.destination);
       source.start(0);
-    } else {
-      // Fallback to HTML5 Audio
-      const audio = cashRegisterAudio.cloneNode();
-      audio.volume = 0.5;
-      audio.play().catch(() => {});
     }
   } catch (e) {
     console.log('Audio play failed:', e);
@@ -92,8 +131,16 @@ function playCashRegisterSound() {
 }
 
 // Initialize on first user interaction
-document.addEventListener('click', initCashRegisterSound, { once: true });
-document.addEventListener('keydown', initCashRegisterSound, { once: true });
+let audioInited = false;
+function ensureAudioInit() {
+  if (!audioInited) {
+    audioInited = true;
+    initCashRegisterSound();
+  }
+}
+
+document.addEventListener('click', ensureAudioInit, { once: true });
+document.addEventListener('keydown', ensureAudioInit, { once: true });
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -556,7 +603,7 @@ async function completeSale() {
 
   try {
     await batch.commit();
-    playCashRegisterSound();
+    await playCashRegisterSound();
     showAlert(`Vendido - ${FORMAT(total)}`, 'success');
     clearCart();
     loadSalesHistory();
