@@ -547,13 +547,8 @@ function renderSalesHistory(sales) {
 
 // ============ ALERTS (replacing toasts) ============
 function showAlert(message, type = 'info') {
-  if (type === 'error') {
-    alert('❌ ' + message);
-  } else if (type === 'success') {
-    alert('✅ ' + message);
-  } else {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-  }
+  // Disabled - alerts interfered with workflow
+  console.log(`[${type.toUpperCase()}] ${message}`);
 }
 
 // ============ HELPERS ============
