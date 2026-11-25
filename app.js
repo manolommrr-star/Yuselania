@@ -33,7 +33,7 @@ const COL = {
   sales: 'sales'
 };
 
-const DISCOUNTS = { normal: 0, forta: 0.15 };
+const DISCOUNTS = { normal: 0, forta: 0 }; // Forta price already includes discount, no extra %
 // Formato simple sin problemas de locale ARS
 const FORMAT = (val) => '$' + Number(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -420,7 +420,7 @@ function recalcCart() {
   const finalTotal = subtotal - discountAmt;
 
   elements.cartSubtotal.textContent = FORMAT(subtotal);
-  elements.cartDiscount.textContent = `-${FORMAT(discountAmt)}`;
+  elements.cartDiscount.textContent = discountAmt > 0 ? `-${FORMAT(discountAmt)}` : '-$0.00';
   elements.cartTotal.textContent = FORMAT(finalTotal);
   elements.btnCheckout.disabled = cart.length === 0;
 
@@ -494,7 +494,7 @@ async function completeSale() {
       subtotal: i.price * i.qty
     })),
     subtotal: cart.reduce((s, i) => s + i.price * i.qty, 0),
-    discount: cart.reduce((s, i) => s + i.price * i.qty, 0) * (DISCOUNTS[selectedCustomerType] || 0),
+    discount: 0, // No extra discount - Forta price already includes it
     total,
     paid: total,
     change: 0,
@@ -563,12 +563,8 @@ function renderSalesHistory(sales) {
 
 // ============ TOASTS ============
 function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span class="toast-message">${escapeHtml(message)}</span><button class="toast-close" aria-label="Cerrar">×</button>`;
-  toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
-  elements.toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  // Disabled - toasts interfered with workflow
+  console.log(`[Toast ${type}] ${message}`);
 }
 
 // ============ HELPERS ============
