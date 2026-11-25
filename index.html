@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+  <title>POS Yuselania</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>POS Yuselania</h1>
+      <div class="header-actions">
+        <select id="customer-type" class="customer-select">
+          <option value="normal">👤 Cliente Normal</option>
+          <option value="forta">⭐ Cliente Forta (VIP)</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="app-main">
+      
+      <!-- POS View -->
+      <section id="view-pos" class="view active pos-layout">
+        <section class="products-section">
+          <div class="section-header pos-section-header">
+            <h2>Productos</h2>
+            <span id="product-count" class="badge">0</span>
+          </div>
+          <div id="product-grid" class="product-grid" role="list"></div>
+          <div id="empty-state" class="empty-state is-hidden">
+            <p>No hay productos aún</p>
+            <small>Ve a la pestaña <strong>Productos</strong> para agregar</small>
+          </div>
+        </section>
+
+        <aside id="cart-sidebar" class="cart-sidebar" aria-label="Carrito de compra">
+          <div id="cart-drawer" class="cart-drawer is-hidden">
+            <div class="cart-header">
+              <h3>🧾 Venta Actual</h3>
+              <div class="cart-header-actions">
+                <button id="btn-clear-cart" class="btn-icon" aria-label="Limpiar carrito" title="Limpiar carrito">🗑️</button>
+                <button id="btn-close-cart" class="btn-icon" aria-label="Ocultar carrito" title="Ocultar carrito">✕</button>
+              </div>
+            </div>
+            <ul id="cart-items" class="cart-items" role="list"></ul>
+            <div id="cart-empty" class="cart-empty">
+              <p>Carrito vacío</p>
+              <small>Toca un producto para agregarlo</small>
+            </div>
+            <div class="cart-summary">
+              <div class="summary-line">
+                <span>Subtotal</span>
+                <span id="cart-subtotal">$0.00</span>
+              </div>
+              <div class="summary-line discount">
+                <span>Descuento Forta</span>
+                <span id="cart-discount">-$0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="cart-bar">
+            <button id="btn-toggle-cart" class="btn-cart-toggle" type="button" aria-expanded="false" aria-controls="cart-drawer">
+              <span class="cart-toggle-icon">🧾</span>
+              <span id="cart-count-badge" class="cart-count-badge">0</span>
+            </button>
+            <div class="cart-bar-total">
+              <span class="cart-bar-label">TOTAL</span>
+              <span id="cart-total" class="cart-bar-amount">$0.00</span>
+            </div>
+            <!-- ONE-TAP CHECKOUT -->
+            <button id="btn-checkout" class="btn-checkout" disabled>COBRAR</button>
+          </div>
+        </aside>
+      </section>
+
+      <!-- Sales History View -->
+      <section id="view-history" class="view is-hidden">
+        <div class="section-header">
+          <h2>Historial de Ventas</h2>
+        </div>
+        <ul id="sales-list" class="sales-list"></ul>
+        <div id="sales-empty" class="empty-state is-hidden">
+          <p>No hay ventas registradas</p>
+        </div>
+      </section>
+
+      <!-- Products Management View -->
+      <section id="view-products" class="view is-hidden">
+        <section id="product-entry" class="product-entry-module closed">
+          <button class="module-toggle" aria-expanded="false" type="button">
+            <span class="toggle-icon">➕</span>
+            <span>Agregar Producto</span>
+            <span class="toggle-chevron">▼</span>
+          </button>
+          <form id="form-product-entry" class="entry-form is-hidden">
+            <div class="form-row">
+              <label for="pe-name">Nombre del producto</label>
+              <input type="text" id="pe-name" placeholder="Ej: Coca Cola 500ml" required>
+            </div>
+            <div class="form-row">
+              <label for="pe-price-normal">Precio Normal</label>
+              <input type="number" id="pe-price-normal" placeholder="0.00" step="0.01" min="0" required>
+            </div>
+            <div class="form-row">
+              <label for="pe-price-forta">Precio Forta (VIP)</label>
+              <input type="number" id="pe-price-forta" placeholder="0.00" step="0.01" min="0">
+            </div>
+            <div class="form-row">
+              <label for="pe-stock">Stock inicial</label>
+              <input type="number" id="pe-stock" placeholder="0" min="0" value="0">
+            </div>
+            <button type="submit" class="btn-submit">Guardar Producto</button>
+          </form>
+        </section>
+
+        <div class="section-header">
+          <h2>Gestión de Productos</h2>
+        </div>
+        <ul id="products-management-list" class="management-list"></ul>
+        <div id="products-empty" class="empty-state is-hidden">
+          <p>No hay productos</p>
+          <small>Agrega el primero arriba ⬆️</small>
+        </div>
+      </section>
+
+    </main>
+
+    <nav class="bottom-nav" role="navigation" aria-label="Navegación principal">
+      <button class="nav-item active" data-view="pos" aria-selected="true">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">POS</span>
+      </button>
+      <button class="nav-item" data-view="history" aria-selected="false">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Ventas</span>
+      </button>
+      <button class="nav-item" data-view="products" aria-selected="false">
+        <span class="nav-icon">📦</span>
+        <span class="nav-label">Productos</span>
+      </button>
+    </nav>
+  </div>
+
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <dialog id="confirm-modal" class="modal">
+    <div class="modal-content">
+      <p id="modal-message"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Cancelar</button>
+        <button class="btn btn-danger" id="modal-confirm">Confirmar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

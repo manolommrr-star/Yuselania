@@ -1,0 +1,15 @@
+{
+  "name": "pos-mvp",
+  "version": "1.0.0",
+  "description": "Basic POS MVP with vanilla JS + Firebase",
+  "scripts": {
+    "dev": "npx serve .",
+    "deploy": "firebase deploy"
+  },
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "firebase": "^10.8.0"
+  }
+}
