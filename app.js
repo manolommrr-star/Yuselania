@@ -329,8 +329,12 @@ function initCustomerType() {
 
 // ============ CART ACTIONS ============
 function initCartActions() {
+  console.log('initCartActions: btnCheckout=', elements.btnCheckout);
   elements.btnClearCart.addEventListener('click', () => confirmAction('¿Limpiar todo el carrito?', clearCart));
-  elements.btnCheckout.addEventListener('click', completeSale);
+  elements.btnCheckout.addEventListener('click', () => {
+    console.log('btnCheckout clicked');
+    completeSale();
+  });
 }
 
 // ============ MODAL ============
@@ -395,6 +399,7 @@ function renderProducts() {
   }).join('');
 
   elements.productGrid.querySelectorAll('.product-btn:not(.out-of-stock)').forEach(btn => {
+    console.log('Attaching click listener to:', btn.dataset.id);
     btn.addEventListener('click', () => addToCart(btn.dataset.id));
     btn.addEventListener('touchstart', () => btn.style.transform = 'scale(0.96)', { passive: true });
     btn.addEventListener('touchend', () => btn.style.transform = '', { passive: true });
@@ -466,8 +471,13 @@ async function deleteProduct(productId) {
 let currentCartTotal = 0; // Store calculated total to avoid DOM parsing issues
 
 function addToCart(productId) {
+  console.log('addToCart called with:', productId);
   const product = products.find(p => p.id === productId);
-  if (!product) return;
+  console.log('Found product:', product);
+  if (!product) {
+    console.error('Product not found:', productId);
+    return;
+  }
 
   const stock = product.stock || 0;
   const existing = cart.find(i => i.productId === productId);
@@ -489,6 +499,7 @@ function addToCart(productId) {
       qty: 1
     });
   }
+  console.log('Cart after add:', cart);
   recalcCart();
   showAlert(`Agregado: ${product.name}`, 'success');
   if (navigator.vibrate) navigator.vibrate(10);
@@ -569,7 +580,11 @@ function clearCart() {
 
 // ============ COMPLETE SALE - ONE TAP ============
 async function completeSale() {
-  if (cart.length === 0) return;
+  console.log('completeSale called, cart:', cart);
+  if (cart.length === 0) {
+    console.log('Cart empty, returning');
+    return;
+  }
 
   const btn = elements.btnCheckout;
   btn.disabled = true;
@@ -615,6 +630,7 @@ async function completeSale() {
     clearCart();
     loadSalesHistory();
   } catch (e) {
+    console.error('Sale error:', e);
     showAlert('Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
