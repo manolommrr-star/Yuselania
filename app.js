@@ -37,77 +37,63 @@ const DISCOUNTS = { normal: 0, forta: 0 }; // Forta price already includes disco
 // Formato simple sin problemas de locale ARS
 const FORMAT = (val) => '$' + Number(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Apple-style purchase sound - clean, glassy major chord
-function playCashRegisterSound() {
+// Real cash register sound - loads CC0 MP3 from slapalert.com
+let cashRegisterAudio = null;
+let audioContext = null;
+
+function initCashRegisterSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    cashRegisterAudio = new Audio();
+    cashRegisterAudio.src = 'https://slapalert.com/sounds/cha-ching.mp3';
+    cashRegisterAudio.preload = 'auto';
+    cashRegisterAudio.crossOrigin = 'anonymous';
     
-    // Master gain with gentle envelope
-    const masterGain = ctx.createGain();
-    masterGain.connect(ctx.destination);
-    masterGain.gain.setValueAtTime(0.35, now);
-    masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-    
-    // Apple purchase sound: G major chord (G4-B4-D5-G5) played as gentle arpeggio
-    // Notes: G4=392, B4=494, D5=587, G5=784
-    const notes = [
-      { freq: 392, delay: 0.00 },    // G4
-      { freq: 494, delay: 0.04 },    // B4
-      { freq: 587, delay: 0.08 },    // D5
-      { freq: 784, delay: 0.12 },    // G5
-    ];
-    
-    notes.forEach(({ freq, delay }) => {
-      const t = now + delay;
-      
-      // Fundamental - soft sine
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      
-      // Gentle attack, long decay
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 1.8);
-      
-      osc.connect(gain);
-      gain.connect(masterGain);
-      osc.start(t);
-      osc.stop(t + 2.0);
-      
-      // Add a subtle 2nd harmonic for "glass" quality
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.value = freq * 2;
-      gain2.gain.setValueAtTime(0, t);
-      gain2.gain.linearRampToValueAtTime(0.05, t + 0.02);
-      gain2.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-      osc2.connect(gain2);
-      gain2.connect(masterGain);
-      osc2.start(t);
-      osc2.stop(t + 1.5);
+    // Decode for Web Audio API (better control)
+    cashRegisterAudio.addEventListener('canplaythrough', () => {
+      audioContext.decodeAudioData(
+        fetch(cashRegisterAudio.src).then(r => r.arrayBuffer())
+      ).then(buffer => {
+        cashRegisterAudio._buffer = buffer;
+      }).catch(() => {});
     });
-    
-    // Very subtle high shimmer (like glass)
-    const shimmer = ctx.createOscillator();
-    const shimmerGain = ctx.createGain();
-    shimmer.type = 'sine';
-    shimmer.frequency.value = 1568; // G6
-    shimmerGain.gain.setValueAtTime(0, now + 0.16);
-    shimmerGain.gain.linearRampToValueAtTime(0.03, now + 0.18);
-    shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-    shimmer.connect(shimmerGain);
-    shimmerGain.connect(masterGain);
-    shimmer.start(now + 0.16);
-    shimmer.stop(now + 1.2);
-    
   } catch (e) {
-    console.log('Audio not available:', e);
+    console.log('Audio init failed:', e);
   }
 }
+
+function playCashRegisterSound() {
+  try {
+    if (!audioContext) initCashRegisterSound();
+    
+    // Resume context if suspended (browser policy)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    
+    // Use decoded buffer if available, otherwise HTMLAudioElement
+    if (cashRegisterAudio._buffer) {
+      const source = audioContext.createBufferSource();
+      source.buffer = cashRegisterAudio._buffer;
+      const gain = audioContext.createGain();
+      gain.gain.value = 0.5;
+      source.connect(gain);
+      gain.connect(audioContext.destination);
+      source.start(0);
+    } else {
+      // Fallback to HTML5 Audio
+      const audio = cashRegisterAudio.cloneNode();
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    }
+  } catch (e) {
+    console.log('Audio play failed:', e);
+  }
+}
+
+// Initialize on first user interaction
+document.addEventListener('click', initCashRegisterSound, { once: true });
+document.addEventListener('keydown', initCashRegisterSound, { once: true });
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
