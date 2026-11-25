@@ -37,6 +37,38 @@ const DISCOUNTS = { normal: 0, forta: 0 }; // Forta price already includes disco
 // Formato simple sin problemas de locale ARS
 const FORMAT = (val) => '$' + Number(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+// Cash register sound using Web Audio API
+function playCashRegisterSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    
+    // "Cha-ching" - two tones
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    osc1.frequency.value = 880;  // A5
+    osc2.frequency.value = 1320; // E6
+    
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+    
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    
+    osc1.start(now);
+    osc1.stop(now + 0.4);
+    osc2.start(now + 0.05);
+    osc2.stop(now + 0.35);
+  } catch (e) {
+    console.log('Audio not available:', e);
+  }
+}
+
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   initElements();
@@ -498,6 +530,7 @@ async function completeSale() {
 
   try {
     await batch.commit();
+    playCashRegisterSound();
     showAlert(`Vendido - ${FORMAT(total)}`, 'success');
     clearCart();
     loadSalesHistory();
