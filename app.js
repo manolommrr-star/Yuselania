@@ -37,33 +37,121 @@ const DISCOUNTS = { normal: 0, forta: 0 }; // Forta price already includes disco
 // Formato simple sin problemas de locale ARS
 const FORMAT = (val) => '$' + Number(val).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Cash register sound using Web Audio API
+// Cash register sound using Web Audio API - realistic mechanical "ka-ching"
 function playCashRegisterSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const now = ctx.currentTime;
     
-    // "Cha-ching" - two tones
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
+    // Master gain
+    const masterGain = ctx.createGain();
+    masterGain.connect(ctx.destination);
+    masterGain.gain.setValueAtTime(0.4, now);
     
-    osc1.type = 'sine';
-    osc2.type = 'triangle';
-    osc1.frequency.value = 880;  // A5
-    osc2.frequency.value = 1320; // E6
+    // ===== FIRST "KA" - Lower thud =====
+    const kaOsc = ctx.createOscillator();
+    const kaGain = ctx.createGain();
+    kaOsc.type = 'sine';
+    kaOsc.frequency.setValueAtTime(220, now);      // A3
+    kaOsc.frequency.exponentialRampToValueAtTime(110, now + 0.08); // Drop to A2
+    kaGain.gain.setValueAtTime(0, now);
+    kaGain.gain.linearRampToValueAtTime(0.5, now + 0.005);
+    kaGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+    kaOsc.connect(kaGain);
+    kaGain.connect(masterGain);
+    kaOsc.start(now);
+    kaOsc.stop(now + 0.2);
     
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
+    // ===== SECOND "CHING" - Metallic ring =====
+    const chingTime = now + 0.08;
     
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    // Fundamental
+    const ching1 = ctx.createOscillator();
+    const chingGain1 = ctx.createGain();
+    ching1.type = 'sine';
+    ching1.frequency.value = 1320; // E6
+    chingGain1.gain.setValueAtTime(0, chingTime);
+    chingGain1.gain.linearRampToValueAtTime(0.6, chingTime + 0.003);
+    chingGain1.gain.exponentialRampToValueAtTime(0.001, chingTime + 0.8);
+    ching1.connect(chingGain1);
+    chingGain1.connect(masterGain);
     
-    osc1.start(now);
-    osc1.stop(now + 0.4);
-    osc2.start(now + 0.05);
-    osc2.stop(now + 0.35);
+    // Harmonic 2x
+    const ching2 = ctx.createOscillator();
+    const chingGain2 = ctx.createGain();
+    ching2.type = 'sine';
+    ching2.frequency.value = 2640; // E7
+    chingGain2.gain.setValueAtTime(0, chingTime);
+    chingGain2.gain.linearRampToValueAtTime(0.3, chingTime + 0.003);
+    chingGain2.gain.exponentialRampToValueAtTime(0.001, chingTime + 0.6);
+    ching2.connect(chingGain2);
+    chingGain2.connect(masterGain);
+    
+    // Harmonic 3x
+    const ching3 = ctx.createOscillator();
+    const chingGain3 = ctx.createGain();
+    ching3.type = 'sine';
+    ching3.frequency.value = 3960; // ~B7
+    chingGain3.gain.setValueAtTime(0, chingTime);
+    chingGain3.gain.linearRampToValueAtTime(0.15, chingTime + 0.003);
+    chingGain3.gain.exponentialRampToValueAtTime(0.001, chingTime + 0.5);
+    ching3.connect(chingGain3);
+    chingGain3.connect(masterGain);
+    
+    // Inharmonic partial for metallic quality (bell-like)
+    const ching4 = ctx.createOscillator();
+    const chingGain4 = ctx.createGain();
+    ching4.type = 'sine';
+    ching4.frequency.value = 1760 * 1.4; // ~2464 Hz (non-integer ratio)
+    chingGain4.gain.setValueAtTime(0, chingTime);
+    chingGain4.gain.linearRampToValueAtTime(0.2, chingTime + 0.003);
+    chingGain4.gain.exponentialRampToValueAtTime(0.001, chingTime + 0.4);
+    ching4.connect(chingGain4);
+    chingGain4.connect(masterGain);
+    
+    // Fifth partial
+    const ching5 = ctx.createOscillator();
+    const chingGain5 = ctx.createGain();
+    ching5.type = 'sine';
+    ching5.frequency.value = 1760 * 2.5; // ~4400 Hz
+    chingGain5.gain.setValueAtTime(0, chingTime);
+    chingGain5.gain.linearRampToValueAtTime(0.1, chingTime + 0.003);
+    chingGain5.gain.exponentialRampToValueAtTime(0.001, chingTime + 0.3);
+    ching5.connect(chingGain5);
+    chingGain5.connect(masterGain);
+    
+    ching1.start(chingTime);
+    ching1.stop(chingTime + 0.9);
+    ching2.start(chingTime);
+    ching2.stop(chingTime + 0.7);
+    ching3.start(chingTime);
+    ching3.stop(chingTime + 0.6);
+    ching4.start(chingTime);
+    ching4.stop(chingTime + 0.5);
+    ching5.start(chingTime);
+    ching5.stop(chingTime + 0.4);
+    
+    // ===== MECHANICAL CLICK (drawer) =====
+    const clickTime = now + 0.16;
+    const clickNoise = ctx.createBufferSource();
+    const clickGain = ctx.createGain();
+    const bufferSize = ctx.sampleRate * 0.02; // 20ms
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      // Short noise burst
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+    }
+    clickNoise.buffer = buffer;
+    clickGain.gain.setValueAtTime(0.3, clickTime);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.05);
+    clickNoise.connect(clickGain);
+    clickGain.connect(masterGain);
+    clickNoise.start(clickTime);
+    
+    // Master fade out
+    masterGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    
   } catch (e) {
     console.log('Audio not available:', e);
   }
