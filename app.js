@@ -46,11 +46,11 @@ async function initCashRegisterSound() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
     // Try to load local MP3 first
-    const response = await fetch('cha-ching.mp3');
+    const response = await fetch('slap-alert-cha-ching.mp3');
     if (response.ok) {
       const arrayBuffer = await response.arrayBuffer();
       cashRegisterBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      console.log('Local cha-ching.mp3 loaded');
+      console.log('Local slap-alert-cha-ching.mp3 loaded');
       return;
     }
   } catch (e) {
@@ -314,6 +314,13 @@ function cancelEdit() {
 function initCustomerType() {
   elements.customerType.addEventListener('change', (e) => {
     selectedCustomerType = e.target.value;
+    // Update prices of items already in cart
+    cart.forEach(item => {
+      const product = products.find(p => p.id === item.productId);
+      if (product) {
+        item.price = getPriceForType(product, selectedCustomerType);
+      }
+    });
     recalcCart();
     renderProducts();
     showAlert(selectedCustomerType === 'forta' ? 'Cliente Forta (VIP)' : 'Cliente Normal', 'info');
