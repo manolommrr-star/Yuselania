@@ -4,7 +4,6 @@ import { db } from './firebase-config.js';
 import {
   collection,
   doc,
-  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -12,7 +11,8 @@ import {
   orderBy,
   onSnapshot,
   writeBatch,
-  serverTimestamp
+  serverTimestamp,
+  increment
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // ============ STATE ============
@@ -76,7 +76,6 @@ function initElements() {
   elements.productsManagementList = document.getElementById('products-management-list');
   elements.productsEmpty = document.getElementById('products-empty');
   elements.navItems = document.querySelectorAll('.nav-item');
-  elements.toastContainer = document.getElementById('toast-container');
   elements.confirmModal = document.getElementById('confirm-modal');
   elements.modalMessage = document.getElementById('modal-message');
   elements.modalCancel = document.getElementById('modal-cancel');
@@ -154,7 +153,7 @@ async function saveProductEntry(e) {
   };
 
   if (!data.name || data.prices.normal <= 0) {
-    showToast('Completa nombre y precio normal', 'error');
+    showAlert('Completa nombre y precio normal', 'error');
     btn.disabled = false;
     btn.textContent = originalText;
     return;
@@ -165,15 +164,15 @@ async function saveProductEntry(e) {
   try {
     if (editingProductId) {
       await updateDoc(doc(db, COL.products, editingProductId), data);
-      showToast('Producto actualizado', 'success');
+      showAlert('Producto actualizado', 'success');
     } else {
       data.createdAt = serverTimestamp();
       await addDoc(collection(db, COL.products), data);
-      showToast('Producto guardado', 'success');
+      showAlert('Producto guardado', 'success');
     }
     closeProductEntry();
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showAlert('Error: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = originalText;
@@ -212,7 +211,7 @@ function initCustomerType() {
     selectedCustomerType = e.target.value;
     recalcCart();
     renderProducts();
-    showToast(selectedCustomerType === 'forta' ? 'Cliente Forta (VIP) - 15% desc.' : 'Cliente Normal', 'info');
+    showAlert(selectedCustomerType === 'forta' ? 'Cliente Forta (VIP)' : 'Cliente Normal', 'info');
   });
 }
 
@@ -220,19 +219,6 @@ function initCustomerType() {
 function initCartActions() {
   elements.btnClearCart.addEventListener('click', () => confirmAction('¿Limpiar todo el carrito?', clearCart));
   elements.btnCheckout.addEventListener('click', completeSale);
-
-  const toggleBtn = document.getElementById('btn-toggle-cart');
-  const closeBtn = document.getElementById('btn-close-cart');
-  const drawer = document.getElementById('cart-drawer');
-
-  if (toggleBtn && drawer) {
-    const setDrawerOpen = (open) => {
-      drawer.classList.toggle('is-hidden', !open);
-      toggleBtn.setAttribute('aria-expanded', String(open));
-    };
-    toggleBtn.addEventListener('click', () => setDrawerOpen(drawer.classList.contains('is-hidden')));
-    closeBtn?.addEventListener('click', () => setDrawerOpen(false));
-  }
 }
 
 // ============ MODAL ============
@@ -266,7 +252,7 @@ function initPosListeners() {
     },
     (err) => {
       console.error('Products listener error:', err);
-      showToast('Error cargando productos: ' + err.message, 'error');
+      showAlert('Error cargando productos: ' + err.message, 'error');
     }
   );
 }
@@ -306,7 +292,7 @@ function renderProducts() {
 function getPriceForType(product, type) {
   const prices = product.prices || {};
   if (type === 'forta' && prices.forta != null) return prices.forta;
-  return prices.normal || prices.regular || product.priceNormal || product.priceRegular || 0;
+  return prices.normal || 0;
 }
 
 // ============ RENDER PRODUCTS MANAGEMENT ============
@@ -358,13 +344,15 @@ function renderProductsManagement() {
 async function deleteProduct(productId) {
   try {
     await updateDoc(doc(db, COL.products, productId), { active: false, updatedAt: serverTimestamp() });
-    showToast('Producto desactivado', 'success');
+    showAlert('Producto desactivado', 'success');
   } catch (err) {
-    showToast('Error: ' + err.message, 'error');
+    showAlert('Error: ' + err.message, 'error');
   }
 }
 
 // ============ CART LOGIC ============
+let currentCartTotal = 0; // Store calculated total to avoid DOM parsing issues
+
 function addToCart(productId) {
   const product = products.find(p => p.id === productId);
   if (!product) return;
@@ -374,7 +362,7 @@ function addToCart(productId) {
   const currentQty = existing ? existing.qty : 0;
 
   if (currentQty >= stock) {
-    showToast('Sin stock disponible', 'error');
+    showAlert('Sin stock disponible', 'error');
     return;
   }
 
@@ -390,7 +378,7 @@ function addToCart(productId) {
     });
   }
   recalcCart();
-  showToast(`Agregado: ${product.name}`, 'success');
+  showAlert(`Agregado: ${product.name}`, 'success');
   if (navigator.vibrate) navigator.vibrate(10);
 }
 
@@ -406,7 +394,7 @@ function updateQty(productId, delta) {
   const maxStock = product?.stock || 0;
   const newQty = item.qty + delta;
   if (newQty <= 0) return removeFromCart(productId);
-  if (newQty > maxStock) { showToast(`Máximo ${maxStock} unidades`, 'error'); return; }
+  if (newQty > maxStock) { showAlert(`Máximo ${maxStock} unidades`, 'error'); return; }
   item.qty = newQty;
   recalcCart();
 }
@@ -418,16 +406,14 @@ function recalcCart() {
   const discountPct = DISCOUNTS[selectedCustomerType] || 0;
   const discountAmt = subtotal * discountPct;
   const finalTotal = subtotal - discountAmt;
+  
+  // Store for completeSale to avoid DOM parsing issues
+  currentCartTotal = finalTotal;
 
   elements.cartSubtotal.textContent = FORMAT(subtotal);
   elements.cartDiscount.textContent = discountAmt > 0 ? `-${FORMAT(discountAmt)}` : '-$0.00';
   elements.cartTotal.textContent = FORMAT(finalTotal);
   elements.btnCheckout.disabled = cart.length === 0;
-
-  const badge = document.getElementById('cart-count-badge');
-  if (badge) {
-    badge.textContent = cart.reduce((sum, item) => sum + item.qty, 0);
-  }
 
   renderCart();
 }
@@ -465,6 +451,7 @@ function renderCart() {
 
 function clearCart() {
   cart = [];
+  currentCartTotal = 0;
   recalcCart();
 }
 
@@ -477,7 +464,7 @@ async function completeSale() {
   btn.classList.add('processing');
   btn.textContent = 'Procesando...';
 
-  const total = parseFloat(elements.cartTotal.textContent.replace(/[^\d.-]/g, '')) || 0;
+  const total = currentCartTotal;
 
   const batch = writeBatch(db);
   const saleRef = doc(collection(db, COL.sales));
@@ -503,22 +490,19 @@ async function completeSale() {
   };
   batch.set(saleRef, saleData);
 
+  // Atomic stock decrement using increment() to avoid race conditions
   for (const item of cart) {
     const productRef = doc(db, COL.products, item.productId);
-    const productSnap = await getDoc(productRef);
-    if (productSnap.exists()) {
-      const currentStock = productSnap.data().stock || 0;
-      batch.update(productRef, { stock: currentStock - item.qty });
-    }
+    batch.update(productRef, { stock: increment(-item.qty) });
   }
 
   try {
     await batch.commit();
-    showToast(`✅ Vendido - ${FORMAT(total)}`, 'success');
+    showAlert(`Vendido - ${FORMAT(total)}`, 'success');
     clearCart();
     loadSalesHistory();
   } catch (e) {
-    showToast('Error: ' + e.message, 'error');
+    showAlert('Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.classList.remove('processing');
@@ -536,7 +520,7 @@ function loadSalesHistory() {
     renderSalesHistory(sales);
   }, (err) => {
     console.error('Sales listener error:', err);
-    showToast('Error cargando ventas: ' + err.message, 'error');
+    showAlert('Error cargando ventas: ' + err.message, 'error');
   });
 }
 
@@ -561,10 +545,15 @@ function renderSalesHistory(sales) {
   }).join('');
 }
 
-// ============ TOASTS ============
-function showToast(message, type = 'info') {
-  // Disabled - toasts interfered with workflow
-  console.log(`[Toast ${type}] ${message}`);
+// ============ ALERTS (replacing toasts) ============
+function showAlert(message, type = 'info') {
+  if (type === 'error') {
+    alert('❌ ' + message);
+  } else if (type === 'success') {
+    alert('✅ ' + message);
+  } else {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+  }
 }
 
 // ============ HELPERS ============
